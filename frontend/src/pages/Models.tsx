@@ -251,9 +251,9 @@ export default function Models() {
           transition={{ duration: 0.6, delay: 0.1 }}
           className="bg-card/95 backdrop-blur-xl border border-border/50 rounded-lg p-6 mb-8"
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
-            {/* Search */}
-            <div className="lg:col-span-2">
+          <div className="flex items-center gap-4 mb-4">
+            {/* Search - takes up remaining space */}
+            <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
@@ -265,48 +265,21 @@ export default function Models() {
               </div>
             </div>
 
-            {/* Type Filter */}
-            <Select value={selectedType} onValueChange={(value) => setSelectedType(value as ModelType | "all")}>
-              <SelectTrigger className="bg-card/90 border-border/50">
-                <SelectValue placeholder="Model Type" />
-              </SelectTrigger>
-              <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50">
-                {modelTypes.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Tag Filter */}
-            <Select value={selectedTag} onValueChange={setSelectedTag}>
-              <SelectTrigger className="bg-card/90 border-border/50">
-                <SelectValue placeholder="Tags" />
-              </SelectTrigger>
-              <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50">
-                <SelectItem value="all">All Tags</SelectItem>
-                {allTags.map((tag) => (
-                  <SelectItem key={tag} value={tag}>
-                    {tag}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Sort */}
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="bg-card/90 border-border/50">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50">
-                {sortOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Sort - fixed width */}
+            <div className="w-40">
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="bg-card/90 border-border/50">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50">
+                  {sortOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="flex items-center justify-between">
