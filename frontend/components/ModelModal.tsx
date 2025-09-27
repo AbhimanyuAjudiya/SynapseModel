@@ -108,7 +108,7 @@ export function ModelModal({ model, isOpen, onClose }: ModelModalProps) {
             className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-card border border-border rounded-2xl shadow-2xl bg-black/60 modal-scrollbar"
           >
             {/* Header */}
-            <div className="sticky top-0 bg-card backdrop-blur-md border-b border-border p-6 flex items-center justify-between">
+            <div className="sticky top-0 z-10 bg-card backdrop-blur-md border-b border-border p-6 flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="text-2xl">{getTypeIcon(model.type)}</div>
                 <div>
@@ -126,11 +126,11 @@ export function ModelModal({ model, isOpen, onClose }: ModelModalProps) {
                 {/* Left Column - Model Details */}
                 <div className="lg:col-span-2 space-y-6">
                   {/* Model Image */}
-                  <div className="aspect-video relative overflow-hidden rounded-lg">
+                  <div className="aspect-video relative overflow-hidden rounded-lg ">
                     <img
                       src={model.thumbnailUrl || "/placeholder.svg"}
                       alt={model.name}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover "
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                     <div className="absolute bottom-4 left-4 flex items-center space-x-2">
