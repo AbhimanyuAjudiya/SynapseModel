@@ -4,7 +4,7 @@ Simple FastAPI Backend for Fluence VM Management
 import os
 import asyncio
 from datetime import datetime, UTC
-from typing import Dict
+from typing import Any, Dict
 
 import httpx
 import uvicorn
@@ -14,6 +14,8 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
+from x402.fastapi.middleware import require_payment
+from x402.types import EIP712Domain, TokenAmount, TokenAsset
 
 load_dotenv()
 
@@ -37,10 +39,20 @@ app = FastAPI(title="Simple Fluence VM Manager")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["*"],  
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],  
+    allow_headers=["*"],  
+)
+
+
+app.middleware("http")(
+    require_payment(
+        path="/api/v1/vms",
+        price="$0.5",
+        pay_to_address="0x2Dd751E8eC017B95e6c40652ED0A8080670e746C",
+        network="base-sepolia",
+    )
 )
 
 async def create_fluence_vm():
@@ -150,7 +162,7 @@ async def download_and_run_model(vm_id: str, blob_id: str, public_key: str):
         # First, wait for VM to be ready (poll VM status)   
         headers = {"Authorization": f"Bearer {FLUENCE_API_KEY}"}
         vm_ready = False
-        max_wait = 300  # 5 minutes timeout
+        max_wait = 1000  # 5 minutes timeout
         wait_time = 0
         
         async with httpx.AsyncClient() as client:
@@ -252,49 +264,74 @@ async def download_and_run_model(vm_id: str, blob_id: str, public_key: str):
             
             # Download the model with progress tracking
             print("Downloading model...")
-            stdin, stdout, stderr = ssh.exec_command(f'curl -L "https://aggregator.testnet.walrus.atalma.io/v1/blobs/by-object-id/${{blob_id}}" -o /home/ubuntu/my_zip.zip')
-            
+            stdin, stdout, stderr = ssh.exec_command(f'curl -L "https://aggregator.testnet.walrus.atalma.io/v1/blobs/by-object-id/{blob_id}" -o /home/ubuntu/my_zip.zip')
+            download_output = stdout.read().decode()
+            download_errors = stderr.read().decode()
+            print(f"Download output: {download_output}")
+            if download_errors:
+                print(f"Download errors: {download_errors}")
+
             # Install unzip package non-interactively
-            stdin, stdout, stderr = ssh.exec_command('sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y unzip')
+            print("Installing unzip...")
+            stdin, stdout, stderr = ssh.exec_command('sudo apt update -y')
+            stdout.read()  # Wait for completion
+            stderr.read()
+
+            stdin, stdout, stderr = ssh.exec_command('sudo DEBIAN_FRONTEND=noninteractive apt install -y unzip')
             unzip_output = stdout.read().decode()
             unzip_errors = stderr.read().decode()
             print(f"Unzip install output: {unzip_output}")
             if unzip_errors:
                 print(f"Unzip install errors: {unzip_errors}")
 
+            # Create model directory and unzip the downloaded file
+            print("Extracting files...")
+            stdin, stdout, stderr = ssh.exec_command('mkdir -p /home/ubuntu/model && unzip -o /home/ubuntu/my_zip.zip -d /home/ubuntu/model')
+            unzip_output = stdout.read().decode()
+            unzip_errors = stderr.read().decode()
+            print(f"Unzip output: {unzip_output}")
+            if unzip_errors:
+                print(f"Unzip errors: {unzip_errors}")
 
-            # Unzip the downloaded file
-            stdin, stdout, stderr = ssh.exec_command('unzip -o /home/ubuntu/my_zip.zip')
+            # Search for .sh file in the unzipped folder
+            print("Looking for shell script...")
+            stdin, stdout, stderr = ssh.exec_command('find /home/ubuntu/model -name "script.sh"')
+            find_output = stdout.read().decode().strip()
+            find_errors = stderr.read().decode()
 
+            print("Present working directory:")
+            stdin, stdout, stderr = ssh.exec_command('pwd')
+            pwd_output = stdout.read().decode().strip()
+            print(f"Working directory: {pwd_output}")
 
-            #search for .sh file in the unzipped folder in /home/ubuntu directory
-            stdin, stdout, stderr = ssh.exec_command('find /home/ubuntu -name "*.sh"')
+            if find_errors:
+                print(f"Find errors: {find_errors}")
 
-            # get the first .sh file path
-            sh_file_path = stdout.read().decode().strip().split('\n')[0]
-            if not sh_file_path:
+            if not find_output:
                 raise Exception("No .sh file found in the unzipped folder")
-            
+
+            # Get the first .sh file path
+            sh_file_path = find_output.split('\n')[0]
             print(f"Found .sh file: {sh_file_path}")
 
             # Make the .sh file executable
-            stdin, stdout, stderr = ssh.exec_command(f'chmod +x {sh_file_path}')
+            print("Making script executable...")
+            stdin, stdout, stderr = ssh.exec_command(f'chmod +x "{sh_file_path}"')
             chmod_output = stdout.read().decode()
-
             chmod_errors = stderr.read().decode()
             print(f"Chmod output: {chmod_output}")
-
             if chmod_errors:
                 print(f"Chmod errors: {chmod_errors}")
 
             # Run the .sh file
-            stdin, stdout, stderr = ssh.exec_command(f'bash {sh_file_path}')
+            print("Running script...")
+            stdin, stdout, stderr = ssh.exec_command(f'bash "{sh_file_path}"')
             run_output = stdout.read().decode()
             run_errors = stderr.read().decode()
             print(f"Run script output: {run_output}")
             if run_errors:
                 print(f"Run script errors: {run_errors}")
-            
+                        
 
             # Wait for download to complete
             download_output = stdout.read().decode()
@@ -457,4 +494,4 @@ async def get_vm_id(public_key: str):
     }
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=80, reload=True)
