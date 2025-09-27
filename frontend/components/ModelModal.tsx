@@ -87,7 +87,7 @@ export function ModelModal({ model, isOpen, onClose }: ModelModalProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-md"
           />
 
           {/* Modal */}
@@ -99,7 +99,7 @@ export function ModelModal({ model, isOpen, onClose }: ModelModalProps) {
             className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-card border border-border rounded-2xl shadow-2xl"
           >
             {/* Header */}
-            <div className="sticky top-0 bg-card/95 backdrop-blur-sm border-b border-border p-6 flex items-center justify-between">
+            <div className="sticky top-0 bg-card backdrop-blur-md border-b border-border p-6 flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="text-2xl">{getTypeIcon(model.type)}</div>
                 <div>
@@ -248,19 +248,21 @@ export function ModelModal({ model, isOpen, onClose }: ModelModalProps) {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Storage:</span>
-                        {model.blobId ? (
-                          <button
-                            onClick={openWalrusLink}
-                            className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer flex items-center gap-1"
-                            title="View on Walruscan"
-                          >
-                            Walrus Network
-                            <ExternalLink className="w-3 h-3" />
-                          </button>
-                        ) : (
                           <span className="font-medium">Walrus Network</span>
-                        )}
                       </div>
+                      {model.blobId && (
+                        <div className="pt-2">
+                          <Button
+                            onClick={openWalrusLink}
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                          >
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            View on Walruscan
+                          </Button>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>

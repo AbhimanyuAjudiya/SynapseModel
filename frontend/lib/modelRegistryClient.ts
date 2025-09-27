@@ -355,13 +355,9 @@ export function convertToModelManifest(modelData: ModelData): ModelManifest {
     framework: "Custom" as const, // Could be enhanced to store framework in contract
     author: `${modelData.uploader.slice(0, 6)}...${modelData.uploader.slice(-4)}`, // Shortened address
     createdAt: new Date(Number(modelData.uploadedAt) * 1000).toISOString().split('T')[0], // Convert timestamp
-    // Additional blockchain-specific fields
+    // Blockchain-specific fields - these will now be preserved throughout the process
     uploader: modelData.uploader,
     blobId: modelData.modelBlobId,
     objectId: modelData.objectId,
-  } as ModelManifest & { 
-    uploader: string
-    blobId: string
-    objectId: string
   }
 }

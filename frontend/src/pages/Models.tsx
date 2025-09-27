@@ -58,7 +58,8 @@ export default function Models() {
 
   // Use blockchain models if available, fallback to mock data for demo
   const allModels = blockchainModels.length > 0 ? blockchainModels : mockModels
-
+  console.log("blockchainModels", blockchainModels)
+  console.log("allModels with blobId check:", allModels.map(m => ({ id: m.id, name: m.name, blobId: m.blobId, objectId: m.objectId, uploader: m.uploader })))
   // Get all unique tags
   const allTags = useMemo(() => {
     const tags = new Set<string>()
@@ -105,9 +106,27 @@ export default function Models() {
     return filtered
   }, [searchQuery, selectedType, selectedTag, sortBy])
 
+  // Debug: Check if blockchain data is preserved in filtered models
+  console.log("filteredModels with blockchain data:", filteredModels.map(m => ({ 
+    id: m.id, 
+    name: m.name, 
+    blobId: m.blobId, 
+    objectId: m.objectId, 
+    uploader: m.uploader 
+  })))
+
   // Pagination
   const totalPages = Math.ceil(filteredModels.length / modelsPerPage)
   const paginatedModels = filteredModels.slice((currentPage - 1) * modelsPerPage, currentPage * modelsPerPage)
+  
+  // Debug: Check if blockchain data is preserved in paginated models
+  console.log("paginatedModels with blockchain data:", paginatedModels.map(m => ({ 
+    id: m.id, 
+    name: m.name, 
+    blobId: m.blobId, 
+    objectId: m.objectId, 
+    uploader: m.uploader 
+  })))
 
   const clearFilters = () => {
     setSearchQuery("")

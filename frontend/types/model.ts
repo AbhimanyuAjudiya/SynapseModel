@@ -18,6 +18,10 @@ export interface ModelManifest {
   framework?: "PyTorch" | "TensorFlow" | "ONNX" | "Custom"
   createdAt?: string
   author?: string
+  // Blockchain-specific fields
+  blobId?: string
+  objectId?: string
+  uploader?: string
 }
 
 export interface PlaygroundSession {
