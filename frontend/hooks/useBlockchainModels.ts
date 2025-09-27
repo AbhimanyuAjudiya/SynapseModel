@@ -18,7 +18,21 @@ export function useBlockchainModels() {
       // Convert blockchain data to frontend format
       const convertedModels = blockchainModels.map(convertToModelManifest)
       
-      console.log('✅ Models fetched and converted:', convertedModels)
+      console.log('✅ Raw blockchain models before conversion:', blockchainModels.map(m => ({
+        name: m.name,
+        originalBlobId: m.originalBlobId,
+        modelBlobId: m.modelBlobId,
+        objectId: m.objectId
+      })))
+      
+      console.log('✅ Models fetched and converted:', convertedModels.map(m => ({
+        id: m.id,
+        name: m.name,
+        blobId: m.blobId,
+        hasBlobId: !!m.blobId,
+        objectId: m.objectId,
+        uploader: m.uploader
+      })))
       setModels(convertedModels)
       
     } catch (err) {

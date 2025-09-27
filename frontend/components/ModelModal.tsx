@@ -23,6 +23,15 @@ export function ModelModal({ model, isOpen, onClose }: ModelModalProps) {
   const [hours, setHours] = useState(1)
   const [showPayment, setShowPayment] = useState(false)
 
+  // Debug: Log the model data to see what we're receiving
+  console.log("🔍 ModelModal received model:", {
+    id: model.id,
+    name: model.name,
+    blobId: model.blobId,
+    objectId: model.objectId,
+    uploader: model.uploader
+  })
+
   const getTypeIcon = (type: string) => {
     switch (type) {
       case "text":
@@ -87,7 +96,7 @@ export function ModelModal({ model, isOpen, onClose }: ModelModalProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
           />
 
           {/* Modal */}
@@ -95,8 +104,8 @@ export function ModelModal({ model, isOpen, onClose }: ModelModalProps) {
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.2 }}
-            className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-card border border-border rounded-2xl shadow-2xl"
+            transition={{ duration: 0.2 }}  
+            className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-card border border-border rounded-2xl shadow-2xl bg-black/60 modal-scrollbar"
           >
             {/* Header */}
             <div className="sticky top-0 bg-card backdrop-blur-md border-b border-border p-6 flex items-center justify-between">

@@ -190,6 +190,7 @@ export interface ModelData {
   description: string
   modelBlobId: string
   objectId: string
+  originalBlobId?: string // The blob ID used to fetch this model from the registry
 }
 
 // Register a new model on the blockchain
@@ -324,8 +325,13 @@ export async function getAllModelsFromBlockchain(): Promise<ModelData[]> {
       try {
         const metadata = await getModelMetadata(blobId)
         if (metadata) {
-          allModels.push(metadata)
-          console.log(`✅ Retrieved model: ${metadata.name}`)
+          // Add the original blobId to the metadata for tracking
+          const modelWithBlobId: ModelData = {
+            ...metadata,
+            originalBlobId: blobId
+          }
+          allModels.push(modelWithBlobId)
+          console.log(`✅ Retrieved model: ${metadata.name} with originalBlobId: ${blobId}, modelBlobId: ${metadata.modelBlobId}`)
         }
       } catch (error) {
         console.error(`❌ Failed to fetch metadata for blobId ${blobId}:`, error)
@@ -344,6 +350,13 @@ export async function getAllModelsFromBlockchain(): Promise<ModelData[]> {
 
 // Convert blockchain model data to frontend model format
 export function convertToModelManifest(modelData: ModelData): ModelManifest {
+  const finalBlobId = modelData.originalBlobId || modelData.modelBlobId
+  console.log(`🔄 Converting model "${modelData.name}":`, {
+    originalBlobId: modelData.originalBlobId,
+    modelBlobId: modelData.modelBlobId,
+    finalBlobId: finalBlobId
+  })
+  
   return {
     id: modelData.modelBlobId,
     name: modelData.name,
@@ -357,7 +370,7 @@ export function convertToModelManifest(modelData: ModelData): ModelManifest {
     createdAt: new Date(Number(modelData.uploadedAt) * 1000).toISOString().split('T')[0], // Convert timestamp
     // Blockchain-specific fields - these will now be preserved throughout the process
     uploader: modelData.uploader,
-    blobId: modelData.modelBlobId,
+    blobId: finalBlobId, // Use original blobId for Walrus links
     objectId: modelData.objectId,
   }
 }
