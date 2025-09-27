@@ -105,7 +105,7 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
                       <Alert variant="destructive">
                         <AlertTriangle className="h-4 w-4" />
                         <AlertDescription className="flex items-center justify-between">
-                          <span>Please switch to Polygon network</span>
+                          <span>Please switch to Polygon Amoy network</span>
                           <Button variant="outline" size="sm" onClick={switchToPolygon} className="ml-2 bg-transparent">
                             Switch
                           </Button>

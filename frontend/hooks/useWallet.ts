@@ -3,7 +3,7 @@
 import { useAccount, useDisconnect, useChainId, useSwitchChain } from "wagmi"
 import { useWeb3Modal } from "@web3modal/wagmi/react"
 import { isSupportedChain, getChainName } from "@/lib/web3"
-import { polygon } from "wagmi/chains"
+import { polygonAmoy } from "@/lib/web3"
 
 export function useWallet() {
   const { address, isConnected, isConnecting } = useAccount()
@@ -33,9 +33,9 @@ export function useWallet() {
 
   const switchToPolygon = async () => {
     try {
-      await switchChain({ chainId: polygon.id })
+      await switchChain({ chainId: polygonAmoy.id })
     } catch (error) {
-      console.error("Failed to switch to Polygon:", error)
+      console.error("Failed to switch to Polygon Amoy:", error)
     }
   }
 

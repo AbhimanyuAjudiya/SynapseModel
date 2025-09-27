@@ -1,30 +1,47 @@
 import { createConfig, http } from "wagmi"
-import { polygon, polygonMumbai } from "wagmi/chains"
+import { defineChain } from "viem"
 import { injected, walletConnect } from "wagmi/connectors"
 
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || "demo-project-id"
 
+// Define Polygon Amoy testnet
+export const polygonAmoy = defineChain({
+  id: 80002,
+  name: 'Polygon Amoy',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'POL',
+    symbol: 'POL',
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://rpc-amoy.polygon.technology/'],
+    },
+  },
+  blockExplorers: {
+    default: { name: 'polygonscan', url: 'https://amoy.polygonscan.com/' },
+  },
+  testnet: true,
+})
+
 export const config = createConfig({
-  chains: [polygon, polygonMumbai],
+  chains: [polygonAmoy],
   connectors: [injected(), walletConnect({ projectId })],
   transports: {
-    [polygon.id]: http(),
-    [polygonMumbai.id]: http(),
+    [polygonAmoy.id]: http('https://polygon-amoy.g.alchemy.com/v2/MfgwMxE_nilnusAamn_chUxACP0N8o1C'),
   },
 })
 
-export const SUPPORTED_CHAINS = [polygon.id, polygonMumbai.id]
+export const SUPPORTED_CHAINS = [polygonAmoy.id] as const
 
 export function isSupportedChain(chainId: number): boolean {
-  return SUPPORTED_CHAINS.includes(chainId)
+  return (SUPPORTED_CHAINS as readonly number[]).includes(chainId)
 }
 
 export function getChainName(chainId: number): string {
   switch (chainId) {
-    case polygon.id:
-      return "Polygon"
-    case polygonMumbai.id:
-      return "Polygon Mumbai"
+    case polygonAmoy.id:
+      return "Polygon Amoy"
     default:
       return "Unknown Network"
   }
@@ -32,10 +49,8 @@ export function getChainName(chainId: number): string {
 
 export function getExplorerUrl(chainId: number): string {
   switch (chainId) {
-    case polygon.id:
-      return "https://polygonscan.com"
-    case polygonMumbai.id:
-      return "https://mumbai.polygonscan.com"
+    case polygonAmoy.id:
+      return "https://www.oklink.com/amoy"
     default:
       return ""
   }

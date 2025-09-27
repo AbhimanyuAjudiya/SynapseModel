@@ -1,103 +1,220 @@
-"use client"
-
 import type React from "react"
 
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { useForm } from "react-hook-form"
-import { Upload, X, CheckCircle, Loader2, Plus } from "lucide-react"
+import { Upload, X, CheckCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { FileDropzone } from "@/components/FileDropzone"
-import { uploadToWalrus, type UploadProgress } from "@/lib/walrusClient"
+import { registerModelOnChain } from "@/lib/modelRegistryClient"
 import { useWallet } from "@/hooks/useWallet"
-import type { ModelType, PricingMode } from "@/types/model"
 
 interface UploadFormData {
   name: string
-  type: ModelType
-  framework: string
   description: string
-  tags: string[]
-  pricingMode: PricingMode
-  pricePerHour?: number
 }
 
-const modelTypes: { value: ModelType; label: string }[] = [
-  { value: "text", label: "Text Generation" },
-  { value: "image", label: "Image Generation" },
-  { value: "audio", label: "Audio Processing" },
-  { value: "multimodal", label: "Multimodal" },
-  { value: "embedding", label: "Embeddings" },
-]
-
-const frameworks = [
-  { value: "PyTorch", label: "PyTorch" },
-  { value: "TensorFlow", label: "TensorFlow" },
-  { value: "ONNX", label: "ONNX" },
-  { value: "Custom", label: "Custom" },
-]
-
-const pricingModes: { value: PricingMode; label: string }[] = [
-  { value: "free", label: "Free" },
-  { value: "hourly", label: "Hourly Rate" },
-  { value: "custom", label: "Custom Pricing" },
-]
+interface WalrusUploadResult {
+  success: boolean
+  fileName: string
+  size: number
+  type: string
+  epochs: number
+  deletable: boolean
+  timestamp: string
+  blobId?: string
+  suiObjectId?: string
+  objectId?: string
+  registeredEpoch?: string
+  endEpoch?: string
+  storageSize?: number
+  cost?: string
+  status?: string
+  message?: string
+  txDigest?: string
+}
 
 export function UploadForm() {
-  const { address } = useWallet()
-  const [modelFiles, setModelFiles] = useState<File[]>([])
-  const [scriptFiles, setScriptFiles] = useState<File[]>([])
-  const [currentTag, setCurrentTag] = useState("")
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
+  const { address, isConnected } = useWallet()
+  const [modelFile, setModelFile] = useState<File | null>(null)
   const [uploadSuccess, setUploadSuccess] = useState(false)
+  const [transactionHash, setTransactionHash] = useState<string>("")
   const [uploadError, setUploadError] = useState("")
+  const [currentStep, setCurrentStep] = useState<"upload" | "register" | "complete">("upload")
+  const [walrusUploadResult, setWalrusUploadResult] = useState<any>(null)
+  const [isFileUploaded, setIsFileUploaded] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<{ progress: number; stage: string } | null>(null)
 
   const {
     register,
     handleSubmit,
-    watch,
-    setValue,
     formState: { errors, isSubmitting },
-  } = useForm<UploadFormData>({
-    defaultValues: {
-      tags: [],
-      pricingMode: "free",
-    },
-  })
+  } = useForm<UploadFormData>()
 
-  const watchedTags = watch("tags") || []
-  const watchedPricingMode = watch("pricingMode")
+  // Walrus constants
+  const WALRUS_PUBLISHER = "https://publisher.walrus-testnet.walrus.space"
+  const MAX_SIZE = 10 * 1024 * 1024 // 10MB
 
-  const addTag = () => {
-    if (currentTag.trim() && !watchedTags.includes(currentTag.trim())) {
-      setValue("tags", [...watchedTags, currentTag.trim()])
-      setCurrentTag("")
+  // Helper function to format file size
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  }
+
+  // Walrus upload function
+  const uploadToWalrus = async (file: File): Promise<WalrusUploadResult> => {
+    if (!file) throw new Error("No file provided")
+
+    // Validate file size
+    if (file.size > MAX_SIZE) {
+      throw new Error(
+        `File too large! Size: ${(file.size / 1024 / 1024).toFixed(
+          1
+        )}MB, Maximum: 10MB`
+      )
+    }
+
+    if (file.size === 0) {
+      throw new Error("Empty file selected")
+    }
+
+    console.log(
+      `📁 Uploading file - Size: ${file.size} bytes, Type: ${file.type}`
+    )
+
+    const walrusResponse = await fetch(
+      `${WALRUS_PUBLISHER}/v1/blobs?epochs=3&deletable=true`,
+      {
+        method: "PUT",
+        body: file,
+        headers: {
+          "Content-Type": file.type || "application/octet-stream",
+        },
+      }
+    )
+
+    console.log(`📡 Walrus response status: ${walrusResponse.status}`)
+
+    if (!walrusResponse.ok) {
+      const errorText = await walrusResponse.text()
+      throw new Error(
+        `Publisher returned error: ${walrusResponse.status} - ${errorText}`
+      )
+    }
+
+    const walrusResult = await walrusResponse.json()
+    console.log("✅ Walrus upload successful!", walrusResult)
+
+    let responseData: WalrusUploadResult = {
+      success: true,
+      fileName: file.name,
+      size: file.size,
+      type: file.type,
+      epochs: 3,
+      deletable: true,
+      timestamp: new Date().toISOString(),
+    }
+
+    if (walrusResult.newlyCreated) {
+      const blobObject = walrusResult.newlyCreated.blobObject
+      responseData = {
+        ...responseData,
+        blobId: blobObject.blobId,
+        suiObjectId: blobObject.id,
+        objectId: blobObject.id, // For compatibility with blockchain registration
+        registeredEpoch: blobObject.registeredEpoch,
+        endEpoch: blobObject.storage.endEpoch,
+        storageSize: blobObject.storage.storageSize,
+        cost: walrusResult.newlyCreated.cost,
+        status: "newly_created",
+        message: "File uploaded successfully!",
+      }
+    } else if (walrusResult.alreadyCertified) {
+      responseData = {
+        ...responseData,
+        blobId: walrusResult.alreadyCertified.blobId,
+        objectId: walrusResult.alreadyCertified.blobId, // For compatibility with blockchain registration
+        endEpoch: walrusResult.alreadyCertified.endEpoch,
+        txDigest: walrusResult.alreadyCertified.event?.txDigest,
+        status: "already_certified",
+        message: "File already exists on Walrus!",
+      }
+    } else {
+      throw new Error("Unexpected response format from Walrus publisher")
+    }
+
+    return responseData
+  }
+
+  // Function to handle file upload to Walrus
+  const handleFileUpload = async (file: File) => {
+    if (!file) return
+
+    setUploadError("")
+    setIsFileUploaded(false)
+    setWalrusUploadResult(null)
+
+    try {
+      console.log('Starting file upload to Walrus...')
+      setUploadProgress({ progress: 5, stage: "preparing" })
+      
+      setUploadProgress({ progress: 50, stage: "uploading" })
+      const uploadResult = await uploadToWalrus(file)
+      
+      console.log('Full Walrus upload result:', uploadResult)
+      setWalrusUploadResult(uploadResult)
+      setIsFileUploaded(true)
+      setUploadProgress(null)
+      
+    } catch (error) {
+      console.error("File upload failed:", error)
+      setUploadError(error instanceof Error ? error.message : "File upload failed")
+      setUploadProgress(null)
+      setIsFileUploaded(false)
+      setWalrusUploadResult(null)
     }
   }
 
-  const removeTag = (tagToRemove: string) => {
-    setValue(
-      "tags",
-      watchedTags.filter((tag) => tag !== tagToRemove),
-    )
-  }
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault()
-      addTag()
+  // Handle file selection
+  const handleFileChange = (files: File[]) => {
+    const file = files[0] || null
+    setModelFile(file)
+    
+    if (file) {
+      // Start upload immediately when file is selected
+      handleFileUpload(file)
+    } else {
+      setIsFileUploaded(false)
+      setWalrusUploadResult(null)
+      setUploadProgress(null)
     }
   }
 
   const onSubmit = async (data: UploadFormData) => {
-    if (modelFiles.length === 0) {
-      setUploadError("Please select at least one model file")
+    if (!modelFile) {
+      setUploadError("Please select a model file")
+      return
+    }
+
+    if (!isConnected) {
+      setUploadError("Please connect your wallet")
+      return
+    }
+
+    if (!isFileUploaded || !walrusUploadResult) {
+      setUploadError("Please wait for file upload to complete")
+      return
+    }
+
+    if (!walrusUploadResult.blobId) {
+      setUploadError("Invalid upload result - missing blobId")
       return
     }
 
@@ -105,46 +222,49 @@ export function UploadForm() {
     setUploadSuccess(false)
 
     try {
-      // Combine all files for upload
-      const allFiles = [...modelFiles, ...scriptFiles]
+      // Step 1: File already uploaded to Walrus, use the stored result
+      console.log('Using stored Walrus upload result:', walrusUploadResult)
 
-      // Upload to Walrus
-      const uploadResult = await uploadToWalrus(allFiles, setUploadProgress)
-
-      // Create model manifest
-      const modelManifest = {
-        id: `model_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      // Step 2: Register model on smart contract
+      setCurrentStep("register")
+      setUploadProgress({ progress: 90, stage: "processing" })
+      
+      console.log('Registering model on blockchain with data:', {
+        blobId: walrusUploadResult.blobId,
+        objectId: walrusUploadResult.objectId || walrusUploadResult.blobId,
         name: data.name,
-        about: data.description,
-        type: data.type,
-        tags: data.tags,
-        framework: data.framework,
-        pricing:
-          data.pricingMode === "free"
-            ? { mode: "free" as const }
-            : data.pricingMode === "hourly"
-              ? { mode: "hourly" as const, pricePerHour: data.pricePerHour || 0 }
-              : { mode: "custom" as const },
-        author: address,
-        createdAt: new Date().toISOString(),
-        walrusCid: uploadResult.cid,
-        manifestUrl: uploadResult.manifestUrl,
+        description: data.description,
+      })
+      
+      const registrationResult = await registerModelOnChain({
+        blobId: walrusUploadResult.blobId!,
+        objectId: walrusUploadResult.objectId || walrusUploadResult.blobId!,
+        name: data.name,
+        description: data.description,
+      })
+
+      if (!registrationResult.success) {
+        throw new Error(registrationResult.error || "Failed to register model on blockchain")
       }
 
-      // In a real app, this would register the model on-chain
-      console.log("Model manifest:", modelManifest)
+      console.log('✅ Model registered successfully on blockchain!')
+      console.log('Transaction hash:', registrationResult.transactionHash)
+      setTransactionHash(registrationResult.transactionHash)
 
+      // Step 3: Complete
+      setCurrentStep("complete")
+      setUploadProgress({ progress: 100, stage: "complete" })
       setUploadSuccess(true)
-      setUploadProgress(null)
 
       // Reset form after successful upload
       setTimeout(() => {
         window.location.href = "/models"
       }, 3000)
     } catch (error) {
-      console.error("Upload failed:", error)
-      setUploadError(error instanceof Error ? error.message : "Upload failed")
+      console.error("Registration failed:", error)
+      setUploadError(error instanceof Error ? error.message : "Registration failed")
       setUploadProgress(null)
+      setCurrentStep("register")
     }
   }
 
@@ -156,14 +276,37 @@ export function UploadForm() {
         className="text-center py-12"
       >
         <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold mb-2">Upload Successful!</h2>
-        <p className="text-muted-foreground mb-4">Your AI model has been uploaded and published to the marketplace.</p>
+        <h2 className="text-2xl font-bold mb-2">Model Published Successfully!</h2>
+        <p className="text-muted-foreground mb-4">
+          Your AI model has been uploaded to Walrus and registered on the blockchain.
+        </p>
+        {transactionHash && (
+          <div className="mb-4 p-3 bg-muted rounded-lg">
+            <p className="text-sm font-medium mb-1">Transaction Hash:</p>
+            <code className="text-xs break-all bg-background px-2 py-1 rounded">
+              {transactionHash}
+            </code>
+          </div>
+        )}
         <p className="text-sm text-muted-foreground">Redirecting to models page...</p>
       </motion.div>
     )
   }
 
   if (uploadProgress) {
+    const getStepMessage = () => {
+      switch (currentStep) {
+        case "upload":
+          return "Uploading model file to Walrus storage..."
+        case "register":
+          return "Registering model on blockchain..."
+        case "complete":
+          return "Upload complete!"
+        default:
+          return "Processing..."
+      }
+    }
+
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -171,71 +314,44 @@ export function UploadForm() {
         className="text-center py-12"
       >
         <Loader2 className="w-16 h-16 animate-spin text-primary mx-auto mb-4" />
-        <h2 className="text-2xl font-bold mb-2">Uploading Model</h2>
-        <p className="text-muted-foreground mb-4 capitalize">{uploadProgress.stage}...</p>
+        <h2 className="text-2xl font-bold mb-2">Publishing Model</h2>
+        <p className="text-muted-foreground mb-4 capitalize">{getStepMessage()}</p>
         <div className="w-full max-w-md mx-auto bg-muted rounded-full h-2">
           <div
             className="bg-primary h-2 rounded-full transition-all duration-300"
-            style={{ width: `${uploadProgress.progress}%` }}
+            style={{ width: `${uploadProgress?.progress || 0}%` }}
           />
         </div>
-        <p className="text-sm text-muted-foreground mt-2">{Math.round(uploadProgress.progress)}% complete</p>
+        <p className="text-sm text-muted-foreground mt-2">{Math.round(uploadProgress?.progress || 0)}% complete</p>
       </motion.div>
     )
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+      {/* Wallet Connection Check */}
+      {!isConnected && (
+        <Alert variant="destructive">
+          <AlertDescription>
+            Please connect your wallet to upload models. The connected wallet will be registered as the model owner.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Basic Information */}
       <Card>
         <CardHeader>
-          <CardTitle>Basic Information</CardTitle>
+          <CardTitle>Model Information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Model Name *</label>
-              <Input
-                {...register("name", { required: "Model name is required" })}
-                placeholder="e.g., GPT-4 Turbo"
-                className={errors.name ? "border-destructive" : ""}
-              />
-              {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">Model Type *</label>
-              <Select onValueChange={(value) => setValue("type", value as ModelType)}>
-                <SelectTrigger className={errors.type ? "border-destructive" : ""}>
-                  <SelectValue placeholder="Select model type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {modelTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.type && <p className="text-sm text-destructive mt-1">{errors.type.message}</p>}
-            </div>
-          </div>
-
           <div>
-            <label className="text-sm font-medium mb-2 block">Framework *</label>
-            <Select onValueChange={(value) => setValue("framework", value)}>
-              <SelectTrigger className={errors.framework ? "border-destructive" : ""}>
-                <SelectValue placeholder="Select framework" />
-              </SelectTrigger>
-              <SelectContent>
-                {frameworks.map((framework) => (
-                  <SelectItem key={framework.value} value={framework.value}>
-                    {framework.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.framework && <p className="text-sm text-destructive mt-1">{errors.framework.message}</p>}
+            <label className="text-sm font-medium mb-2 block">Model Name *</label>
+            <Input
+              {...register("name", { required: "Model name is required" })}
+              placeholder="e.g., GPT-4 Turbo"
+              className={errors.name ? "border-destructive" : ""}
+            />
+            {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
           </div>
 
           <div>
@@ -248,120 +364,77 @@ export function UploadForm() {
             />
             {errors.description && <p className="text-sm text-destructive mt-1">{errors.description.message}</p>}
           </div>
-
-          <div>
-            <label className="text-sm font-medium mb-2 block">Tags</label>
-            <div className="flex space-x-2 mb-2">
-              <Input
-                value={currentTag}
-                onChange={(e) => setCurrentTag(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Add tags (press Enter)"
-                className="flex-1"
-              />
-              <Button type="button" onClick={addTag} variant="outline" size="sm">
-                <Plus className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {watchedTags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="flex items-center space-x-1">
-                  <span>{tag}</span>
-                  <button type="button" onClick={() => removeTag(tag)} className="ml-1 hover:text-destructive">
-                    <X className="w-3 h-3" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-          </div>
         </CardContent>
       </Card>
 
       {/* File Upload */}
       <Card>
         <CardHeader>
-          <CardTitle>Model Files</CardTitle>
+          <CardTitle>Model File</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
-            <label className="text-sm font-medium mb-2 block">Model Files *</label>
+            <label className="text-sm font-medium mb-2 block">Model File (.zip) *</label>
             <FileDropzone
-              files={modelFiles}
-              onFilesChange={setModelFiles}
-              accept=".pt,.pth,.pb,.h5,.onnx,.pkl,.bin,.safetensors"
-              maxFiles={10}
-              maxSize={1024 * 1024 * 1024} // 1GB
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Upload your model files (.pt, .pth, .pb, .h5, .onnx, etc.)
-            </p>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium mb-2 block">Script Files (Optional)</label>
-            <FileDropzone
-              files={scriptFiles}
-              onFilesChange={setScriptFiles}
-              accept=".py,.js,.sh,.yaml,.yml,.json,.txt,.md"
-              maxFiles={5}
+              files={modelFile ? [modelFile] : []}
+              onFilesChange={handleFileChange}
+              accept=".zip"
+              maxFiles={1}
               maxSize={10 * 1024 * 1024} // 10MB
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Upload inference scripts, configuration files, or documentation
+              Upload your model as a single .zip file containing all model assets. Maximum size: 10MB. Upload starts automatically when you select a file.
             </p>
+            
+            {/* File Upload Status */}
+            {modelFile && (
+              <div className="mt-3 p-3 bg-muted rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <span className="text-sm font-medium">{modelFile.name}</span>
+                    <p className="text-xs text-muted-foreground">
+                      {formatFileSize(modelFile.size)} • {modelFile.type || "Unknown type"}
+                    </p>
+                  </div>
+                  {isFileUploaded ? (
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                  ) : uploadProgress ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  ) : uploadError ? (
+                    <X className="w-4 h-4 text-red-500" />
+                  ) : null}
+                </div>
+                {uploadProgress && (
+                  <div className="mt-2">
+                    <div className="w-full bg-background rounded-full h-2">
+                      <div
+                        className="bg-primary h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${(uploadProgress as { progress: number; stage: string }).progress}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 capitalize">
+                      {(uploadProgress as { progress: number; stage: string }).stage} - {Math.round((uploadProgress as { progress: number; stage: string }).progress)}% complete
+                    </p>
+                  </div>
+                )}
+                {isFileUploaded && walrusUploadResult && (
+                  <div className="mt-2 text-xs text-green-600">
+                    ✓ File uploaded successfully to Walrus
+                    <br />
+                    Status: {walrusUploadResult.status?.replace("_", " ") || "uploaded"}
+                    <br />
+                    Blob ID: {walrusUploadResult.blobId}
+                    {walrusUploadResult.cost && (
+                      <>
+                        <br />
+                        Cost: {walrusUploadResult.cost}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Pricing */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Pricing</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <label className="text-sm font-medium mb-2 block">Pricing Mode *</label>
-            <Select onValueChange={(value) => setValue("pricingMode", value as PricingMode)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select pricing mode" />
-              </SelectTrigger>
-              <SelectContent>
-                {pricingModes.map((mode) => (
-                  <SelectItem key={mode.value} value={mode.value}>
-                    {mode.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {watchedPricingMode === "hourly" && (
-            <div>
-              <label className="text-sm font-medium mb-2 block">Price per Hour (POL) *</label>
-              <Input
-                type="number"
-                step="0.0001"
-                min="0"
-                {...register("pricePerHour", {
-                  required: watchedPricingMode === "hourly" ? "Price per hour is required" : false,
-                  min: { value: 0, message: "Price must be positive" },
-                })}
-                placeholder="0.05"
-                className={errors.pricePerHour ? "border-destructive" : ""}
-              />
-              {errors.pricePerHour && <p className="text-sm text-destructive mt-1">{errors.pricePerHour.message}</p>}
-              <p className="text-xs text-muted-foreground mt-1">Set your hourly rate in POL tokens</p>
-            </div>
-          )}
-
-          {watchedPricingMode === "custom" && (
-            <Alert>
-              <AlertDescription>
-                Custom pricing will require manual negotiation with users. You can be contacted through your wallet
-                address.
-              </AlertDescription>
-            </Alert>
-          )}
         </CardContent>
       </Card>
 
@@ -377,7 +450,7 @@ export function UploadForm() {
         <Button type="button" variant="outline" onClick={() => window.history.back()}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isSubmitting || modelFiles.length === 0} size="lg">
+        <Button type="submit" disabled={isSubmitting || !modelFile || !isConnected || !isFileUploaded} size="lg">
           {isSubmitting ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

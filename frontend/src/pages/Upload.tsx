@@ -77,7 +77,7 @@ export default function Upload() {
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription className="flex items-center justify-between">
-                <span>Please switch to Polygon network to upload models</span>
+                <span>Please switch to Polygon Amoy network to upload models</span>
                 <Button variant="outline" size="sm" onClick={switchToPolygon} className="ml-2 bg-transparent">
                   Switch Network
                 </Button>

@@ -34,7 +34,7 @@ export function PaymentFlow({ model, hours, totalCost, onSuccess, onCancel }: Pa
     }
 
     if (!isOnSupportedChain) {
-      setError("Please switch to Polygon network")
+      setError("Please switch to Polygon Amoy network")
       return
     }
 
@@ -113,7 +113,7 @@ export function PaymentFlow({ model, hours, totalCost, onSuccess, onCancel }: Pa
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription className="flex items-center justify-between">
-                  <span>Please switch to Polygon network</span>
+                  <span>Please switch to Polygon Amoy network</span>
                   <Button variant="outline" size="sm" onClick={switchToPolygon} className="ml-2 bg-transparent">
                     Switch
                   </Button>
