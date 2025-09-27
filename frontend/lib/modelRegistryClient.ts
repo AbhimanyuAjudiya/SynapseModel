@@ -1,6 +1,7 @@
 import { writeContract, waitForTransactionReceipt, readContract } from "wagmi/actions"
 import { config } from "./web3"
 import { Address } from "viem"
+import type { ModelManifest } from "@/types/model"
 
 // Model Registry Contract ABI (Updated to match your contract)
 const MODEL_REGISTRY_ABI = [
@@ -299,5 +300,68 @@ export async function getTotalModels(): Promise<number> {
   } catch (error) {
     console.error("Failed to get total models:", error)
     return 0
+  }
+}
+
+// Fetch all models from the blockchain
+export async function getAllModelsFromBlockchain(): Promise<ModelData[]> {
+  try {
+    console.log("🔍 Fetching all models from blockchain...")
+    
+    // Get all blob IDs
+    const blobIds = await getAllModelBlobIds()
+    console.log("📋 Found blob IDs:", blobIds)
+    
+    if (blobIds.length === 0) {
+      console.log("📭 No models found on blockchain")
+      return []
+    }
+    
+    // Fetch metadata for each model
+    const allModels: ModelData[] = []
+    
+    for (const blobId of blobIds) {
+      try {
+        const metadata = await getModelMetadata(blobId)
+        if (metadata) {
+          allModels.push(metadata)
+          console.log(`✅ Retrieved model: ${metadata.name}`)
+        }
+      } catch (error) {
+        console.error(`❌ Failed to fetch metadata for blobId ${blobId}:`, error)
+        // Continue with other models even if one fails
+      }
+    }
+    
+    console.log(`🎯 Successfully fetched ${allModels.length} models from blockchain`)
+    return allModels
+    
+  } catch (error) {
+    console.error("Failed to fetch all models from blockchain:", error)
+    return []
+  }
+}
+
+// Convert blockchain model data to frontend model format
+export function convertToModelManifest(modelData: ModelData): ModelManifest {
+  return {
+    id: modelData.modelBlobId,
+    name: modelData.name,
+    about: modelData.description,
+    type: "text" as const, // Default type, could be enhanced to store type in contract
+    tags: ["blockchain", "uploaded"], // Default tags, could be enhanced to store tags in contract  
+    thumbnailUrl: "/ai-brain-neural-network.jpg", // Default thumbnail
+    pricing: { mode: "hourly" as const, pricePerHour: 0.05 }, // Default pricing
+    framework: "Custom" as const, // Could be enhanced to store framework in contract
+    author: `${modelData.uploader.slice(0, 6)}...${modelData.uploader.slice(-4)}`, // Shortened address
+    createdAt: new Date(Number(modelData.uploadedAt) * 1000).toISOString().split('T')[0], // Convert timestamp
+    // Additional blockchain-specific fields
+    uploader: modelData.uploader,
+    blobId: modelData.modelBlobId,
+    objectId: modelData.objectId,
+  } as ModelManifest & { 
+    uploader: string
+    blobId: string
+    objectId: string
   }
 }
