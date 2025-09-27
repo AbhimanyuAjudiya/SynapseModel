@@ -424,6 +424,8 @@ export function UploadForm() {
                     Status: {walrusUploadResult.status?.replace("_", " ") || "uploaded"}
                     <br />
                     Blob ID: {walrusUploadResult.blobId}
+                    <br />
+                    Object ID: {walrusUploadResult.objectId}
                     {walrusUploadResult.cost && (
                       <>
                         <br />
