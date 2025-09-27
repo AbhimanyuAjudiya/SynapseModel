@@ -17,5 +17,11 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true
+  },
+  optimizeDeps: {
+    exclude: ['@mysten/walrus-wasm']
+  },
+  worker: {
+    format: 'es'
   }
 })
