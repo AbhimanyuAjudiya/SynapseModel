@@ -11,7 +11,10 @@ import { PaymentFlow } from "@/components/PaymentFlow"
 import type { ModelManifest } from "@/types/model"
 
 interface ModelModalProps {
-  model: ModelManifest
+  model: ModelManifest & {
+    blobId?: string
+    objectId?: string
+  }
   isOpen: boolean
   onClose: () => void
 }
@@ -50,6 +53,13 @@ export function ModelModal({ model, isOpen, onClose }: ModelModalProps) {
       return 0
     }
     return hours * model.pricing.pricePerHour
+  }
+
+  const openWalrusLink = () => {
+    if (model.blobId) {
+      const url = `https://walruscan.com/testnet/blob/${model.blobId}`
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
   }
 
   const handleTryNow = () => {
@@ -238,7 +248,18 @@ export function ModelModal({ model, isOpen, onClose }: ModelModalProps) {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Storage:</span>
-                        <span className="font-medium">Walrus Network</span>
+                        {model.blobId ? (
+                          <button
+                            onClick={openWalrusLink}
+                            className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer flex items-center gap-1"
+                            title="View on Walruscan"
+                          >
+                            Walrus Network
+                            <ExternalLink className="w-3 h-3" />
+                          </button>
+                        ) : (
+                          <span className="font-medium">Walrus Network</span>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
