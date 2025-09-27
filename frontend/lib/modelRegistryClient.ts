@@ -167,7 +167,7 @@ const MODEL_REGISTRY_ABI = [
 ] as const
 
 // Contract address from deployment
-const CONTRACT_ADDRESS = "0xf12ad4ac08a58d751f323edf552f6223f17dbcf5" as Address
+const CONTRACT_ADDRESS = "0x4c6b95942a79b03275b1f54cb2994db9a923d23a" as Address
 
 export interface ModelMetadata {
   blobId: string
