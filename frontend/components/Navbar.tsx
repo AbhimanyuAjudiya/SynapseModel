@@ -7,7 +7,7 @@ import { Menu, X, Wallet, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { WalletModal } from "@/components/WalletModal"
-import { useWallet } from "@/hooks/useWallet"
+import { useWallet } from "@/contexts/WalletContext"
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)

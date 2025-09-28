@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { Web3Provider } from '@/components/Web3Provider'
+import { WalletProvider } from '@/contexts/WalletContext'
 import { ScrollToTop } from './components/ScrollToTop'
 import Home from './pages/Home'
 import Models from './pages/Models'
@@ -11,7 +11,7 @@ function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
-      <Web3Provider>
+      <WalletProvider>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/models" element={<Models />} />
@@ -19,7 +19,7 @@ function App() {
           <Route path="/upload" element={<Upload />} />
           <Route path="/about" element={<About />} />
         </Routes>
-      </Web3Provider>
+      </WalletProvider>
     </BrowserRouter>
   )
 }

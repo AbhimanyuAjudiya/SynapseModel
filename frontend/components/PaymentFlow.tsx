@@ -6,8 +6,13 @@ import { X, Wallet, AlertCircle, CheckCircle, Loader2, AlertTriangle } from "luc
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+<<<<<<< Updated upstream
 import { simulatePayment, formatEther } from "@/components/paymentClient"
 import { useWallet } from "@/hooks/useWallet"
+=======
+// import { simulatePayment, formatEther } from "@/lib/paymentClient"
+import { useWallet } from "@/contexts/WalletContext"
+>>>>>>> Stashed changes
 import type { ModelManifest } from "@/types/model"
 
 interface PaymentFlowProps {
@@ -25,7 +30,16 @@ export function PaymentFlow({ model, hours, totalCost, onSuccess, onCancel }: Pa
   const [transactionHash, setTransactionHash] = useState("")
   const [error, setError] = useState("")
 
-  const { isConnected, isOnSupportedChain, address, switchToPolygon } = useWallet()
+  const { isConnected, isOnSupportedChain, address } = useWallet()
+
+  // This component is deprecated - using x402 pattern now
+  const switchToPolygon = () => console.log('switchToPolygon deprecated')
+  const simulatePayment = async (address: string, paymentData: any) => ({ 
+    success: true, 
+    transactionHash: 'deprecated',
+    error: null 
+  })
+  const formatEther = (value: number) => `${value} ETH`
 
   const handlePayment = async () => {
     if (!isConnected) {
@@ -48,13 +62,13 @@ export function PaymentFlow({ model, hours, totalCost, onSuccess, onCancel }: Pa
 
     try {
       const result = await simulatePayment(
+        address,
         {
           modelId: model.id,
           hours,
           pricePerHour: model.pricing?.pricePerHour || 0,
           totalCost,
-        },
-        address,
+        }
       )
 
       if (result.success) {

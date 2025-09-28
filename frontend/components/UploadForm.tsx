@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { FileDropzone } from "@/components/FileDropzone"
 import { registerModelOnChain } from "@/lib/modelRegistryClient"
-import { useWallet } from "@/hooks/useWallet"
+import { useWallet } from "@/contexts/WalletContext"
 
 interface UploadFormData {
   name: string

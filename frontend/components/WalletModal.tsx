@@ -2,12 +2,12 @@
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Wallet, AlertTriangle, ExternalLink, Copy, Check } from "lucide-react"
+import { X, Wallet, ExternalLink, Copy, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { useWallet } from "@/hooks/useWallet"
+import { useWallet } from "@/contexts/WalletContext"
 import { getExplorerUrl } from "@/lib/web3"
 
 interface WalletModalProps {
@@ -25,7 +25,6 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
     currentChainName,
     connectWallet,
     disconnectWallet,
-    switchToPolygon,
     formatAddress,
   } = useWallet()
 
@@ -100,19 +99,6 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {/* Network Warning */}
-                    {!isOnSupportedChain && (
-                      <Alert variant="destructive">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertDescription className="flex items-center justify-between">
-                          <span>Please switch to Polygon Amoy network</span>
-                          <Button variant="outline" size="sm" onClick={switchToPolygon} className="ml-2 bg-transparent">
-                            Switch
-                          </Button>
-                        </AlertDescription>
-                      </Alert>
-                    )}
-
                     {/* Wallet Info */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">

@@ -1,95 +1,150 @@
+<<<<<<< Updated upstream:frontend/components/paymentClient.ts
 import { writeContract, waitForTransactionReceipt } from "wagmi/actions"
 import { config } from "../lib/web3"
 import { parseEther } from "viem"
+=======
+import axios from "axios"
+import type { AxiosInstance } from "axios"
+import type { WalletClient } from "viem"
+import { withPaymentInterceptor } from "x402-axios"
+>>>>>>> Stashed changes:frontend/lib/paymentClient.ts
 
-export interface PaymentRequest {
-  modelId: string
-  hours: number
-  pricePerHour: number
-  totalCost: number
+// VM Creation interfaces
+export interface VMCreationRequest {
+  public_key: string
+  blob_id: string
 }
 
-export interface PaymentResult {
-  transactionHash: string
+export interface VMCreationResult {
   success: boolean
+  vmId?: string
   error?: string
 }
 
-// Mock contract ABI for AI Marketplace payments
-const MARKETPLACE_ABI = [
-  {
-    name: "purchaseModelAccess",
-    type: "function",
-    stateMutability: "payable",
-    inputs: [
-      { name: "modelId", type: "string" },
-      { name: "hours", type: "uint256" },
-    ],
-    outputs: [],
+// X402 Payment Configuration for Base Sepolia  
+const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://81.15.150.142"
+
+// Base axios instance without payment interceptor
+const baseApiClient = axios.create({
+  baseURL: BACKEND_BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
   },
-] as const
+})
 
-const MARKETPLACE_CONTRACT_ADDRESS = "0x1234567890123456789012345678901234567890" // Mock contract address
+// This will be dynamically set based on wallet connection
+let apiClient: AxiosInstance = baseApiClient
 
-export async function processPayment(request: PaymentRequest, walletAddress: string): Promise<PaymentResult> {
-  try {
-    // For demo purposes, we'll simulate the payment
-    // In production, this would interact with a real smart contract
-
-    const hash = await writeContract(config, {
-      address: MARKETPLACE_CONTRACT_ADDRESS,
-      abi: MARKETPLACE_ABI,
-      functionName: "purchaseModelAccess",
-      args: [request.modelId, BigInt(Math.floor(request.hours * 3600))], // Convert hours to seconds
-      value: parseEther(request.totalCost.toString()),
+// Update the API client with a wallet for x402 payments
+export function updateApiClient(walletClient: WalletClient | null) {
+  if (walletClient && walletClient.account) {
+    // Create axios instance with x402 payment interceptor
+    // This will automatically handle 402 responses by paying 0.5 USDC
+    apiClient = withPaymentInterceptor(baseApiClient, walletClient as any)
+    console.log("💳 API client updated with x402 payment support for:", walletClient.account.address)
+    console.log("💳 Wallet client details:", {
+      account: walletClient.account.address,
+      chain: walletClient.chain?.name,
+      chainId: walletClient.chain?.id
     })
-
-    // Wait for transaction confirmation
-    await waitForTransactionReceipt(config, { hash })
-
-    return {
-      transactionHash: hash,
-      success: true,
-    }
-  } catch (error) {
-    console.error("Payment failed:", error)
-    return {
-      transactionHash: "",
-      success: false,
-      error: error instanceof Error ? error.message : "Payment failed",
-    }
+  } else {
+    // No wallet connected - reset to base client
+    apiClient = baseApiClient
+    console.log("⚠️ API client reset - no wallet connected")
   }
 }
 
-export async function simulatePayment(request: PaymentRequest, walletAddress: string): Promise<PaymentResult> {
+// Test function to check backend response
+export const testBackendResponse = async (modelData?: { objectId?: string, uploader?: string }) => {
   try {
-    // Mock payment simulation with realistic delay
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-
-    // Simulate random success/failure for demo (90% success rate)
-    const success = Math.random() > 0.1
-
-    if (!success) {
-      throw new Error("Transaction failed: Insufficient funds or network error")
+    console.log("🧪 Testing backend response...")
+    const testPayload = {
+      public_key: modelData?.uploader || "test_uploader_address",
+      blob_id: modelData?.objectId || "test_object_id"
     }
-
-    return {
-      transactionHash: `0x${Math.random().toString(16).substr(2, 64)}`,
-      success: true,
+    console.log("🧪 Sending POST payload:", testPayload)
+    
+    // Try form-encoded data instead of JSON
+    const formData = new URLSearchParams()
+    formData.append('public_key', testPayload.public_key)
+    formData.append('blob_id', testPayload.blob_id)
+    
+    const response = await fetch('http://81.15.150.142/api/v1/vms', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData
+    })
+    
+    console.log("🧪 Backend responded with status:", response.status)
+    
+    if (response.ok) {
+      const data = await response.text() // Try text first in case it's not JSON
+      console.log("🧪 Backend response data:", data)
+      return { status: response.status, data }
+    } else {
+      const errorText = await response.text()
+      console.log("🧪 Backend error response:", errorText)
+      throw new Error(`HTTP ${response.status}: ${errorText}`)
     }
-  } catch (error) {
-    return {
-      transactionHash: "",
-      success: false,
-      error: error instanceof Error ? error.message : "Payment failed",
-    }
+  } catch (error: any) {
+    console.log("🧪 Full error:", error)
+    throw error
   }
 }
 
-export function calculateCost(hours: number, pricePerHour: number): number {
-  return Number((hours * pricePerHour).toFixed(4))
-}
+// Main API for VM creation with automatic x402 payment handling
+export const api = {
+  // Create VM with automatic 0.5 USDC payment on 402 response
+  createVM: async (request: VMCreationRequest): Promise<VMCreationResult> => {
+    try {
+      console.log("🚀 Creating VM - will pay 0.5 USDC if 402 response...")
+      console.log("🚀 Request details:", request)
+      console.log("🚀 Backend URL:", BACKEND_BASE_URL)
+      console.log("🚀 Using API client:", apiClient === baseApiClient ? "base client (no x402)" : "x402-enabled client")
+      
+      // Make request to /api/v1/vms
+      // If server responds with 402, x402 interceptor will:
+      // 1. Parse the payment requirements
+      // 2. Automatically pay 0.5 USDC on Base Sepolia  
+      // 3. Retry the request with payment proof
+      const response = await apiClient.post("/api/v1/vms", request)
+      
+      console.log("✅ VM created successfully:", response.data)
+      return {
+        success: true,
+        vmId: response.data.vm_id || response.data.vmId || response.data.id,
+      }
+    } catch (error: any) {
+      console.error("❌ VM creation failed:", error)
+      
+      // Handle specific errors
+      if (error.response?.status === 402) {
+        return {
+          success: false,
+          error: "Payment required: 0.5 USDC on Base Sepolia. Please ensure sufficient wallet balance."
+        }
+      }
+      
+      if (error.message?.includes("insufficient")) {
+        return {
+          success: false,
+          error: "Insufficient USDC balance. You need 0.5 USDC to access this model."
+        }
+      }
 
-export function formatEther(value: number): string {
-  return `${value.toFixed(4)} POL`
+      if (error.message?.includes("User rejected")) {
+        return {
+          success: false,
+          error: "Payment cancelled. Please approve the 0.5 USDC transaction to continue."
+        }
+      }
+      
+      return {
+        success: false,
+        error: error.message || "Failed to create VM"
+      }
+    }
+  }
 }

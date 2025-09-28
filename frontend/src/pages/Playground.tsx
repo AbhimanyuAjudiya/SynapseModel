@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useParams } from "react-router-dom"
 import { motion } from "framer-motion"
+<<<<<<< Updated upstream
 import { Navbar } from "../../components/Navbar"
 import { Footer } from "../../components/Footer"
 import { Button } from "../../components/ui/button"
@@ -12,9 +13,21 @@ import { ModelExecution } from "../components/ModelExecution"
 import { ErrorBoundary } from "../components/ErrorBoundary"
 import { useVM } from "../hooks/useVM"
 import { Server, Brain, Zap, Settings } from "lucide-react"
+=======
+import { Navbar } from "@/components/Navbar"
+import { Footer } from "@/components/Footer"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Play, Copy, Download, Wallet, CheckCircle } from "lucide-react"
+import { useX402Payment } from "@/hooks/useX402Payment"
+>>>>>>> Stashed changes
 
 function PlaygroundContent() {
   const { id } = useParams<{ id: string }>()
+<<<<<<< Updated upstream
   const [activeTab, setActiveTab] = useState<'dashboard' | 'execution'>('dashboard')
   
   const {
@@ -34,13 +47,73 @@ function PlaygroundContent() {
     clearError,
     clearExecutionResult,
   } = useVM()
+=======
+  const { createVM, isLoading: x402Loading, error: x402Error } = useX402Payment()
+  const [input, setInput] = useState("")
+  const [output, setOutput] = useState("")
+  const [isRunning, setIsRunning] = useState(false)
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'completed' | 'failed'>('idle')
+  const [walletConnected, setWalletConnected] = useState(false)
+
+  // Check wallet connection on component mount
+  useEffect(() => {
+    const checkWallet = async () => {
+      if (typeof window !== 'undefined' && window.ethereum) {
+        try {
+          const accounts = await window.ethereum.request({ method: 'eth_accounts' })
+          setWalletConnected(accounts && accounts.length > 0)
+        } catch (error) {
+          console.error("Failed to check wallet connection:", error)
+        }
+      }
+    }
+    checkWallet()
+  }, [])
+>>>>>>> Stashed changes
 
   const handlePublicKeyChange = (key: string) => {
     setPublicKey(key)
   }
 
+<<<<<<< Updated upstream
   const handleFetchVMId = async () => {
     await fetchVMId()
+=======
+  const runModel = async () => {
+    if (!input.trim()) return
+    
+    setIsRunning(true)
+    setPaymentStatus('processing')
+    
+    try {
+      // Create VM with x402 payment
+      const vmResult = await createVM({
+        public_key: `playground_${Date.now()}`,
+        blob_id: model.id,
+      })
+
+      if (!vmResult.success) {
+        setPaymentStatus('failed')
+        setOutput(`❌ Payment failed: ${vmResult.error}\n\nPlease check your wallet connection and ensure you have sufficient funds on Base Sepolia.`)
+        return
+      }
+
+      setPaymentStatus('completed')
+      
+      // Simulate model execution after successful payment
+      setTimeout(() => {
+        setOutput(`✅ Payment processed via x402 on Base Sepolia!\n\nVM ID: ${vmResult.vmId}\n\n🤖 Model Response:\n"${input}"\n\nThis is a simulated response from the ${model.name} model running on the paid VM. The x402 payment system automatically handled the micropayment for this model inference on Base Sepolia network.`)
+        setIsRunning(false)
+        // Reset payment status after successful execution
+        setTimeout(() => setPaymentStatus('idle'), 3000)
+      }, 2000)
+      
+    } catch (error) {
+      setPaymentStatus('failed')
+      setOutput(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}\n\nPlease ensure MetaMask is connected to Base Sepolia and you have sufficient ETH.`)
+      setIsRunning(false)
+    }
+>>>>>>> Stashed changes
   }
 
   const handleRefreshVMInfo = async () => {
@@ -157,14 +230,46 @@ function PlaygroundContent() {
           </Card>
         </motion.div>
 
+<<<<<<< Updated upstream
         {/* Main Content */}
         <div className="space-y-6">
           {/* VM Control Panel - Always visible */}
+=======
+        {/* Payment Status Alert */}
+        {paymentStatus !== 'idle' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="mb-6"
+          >
+            <Alert className={paymentStatus === 'failed' ? 'border-red-200 bg-red-50' : paymentStatus === 'completed' ? 'border-green-200 bg-green-50' : ''}>
+              {paymentStatus === 'processing' ? (
+                <Wallet className="w-4 h-4 animate-pulse" />
+              ) : paymentStatus === 'completed' ? (
+                <CheckCircle className="w-4 h-4 text-green-600" />
+              ) : (
+                <Wallet className="w-4 h-4 text-red-600" />
+              )}
+              <AlertDescription>
+                {paymentStatus === 'processing' && 'Processing payment via x402 on Base Sepolia...'}
+                {paymentStatus === 'completed' && '✅ Payment completed! VM is ready for model execution.'}
+                {paymentStatus === 'failed' && '❌ Payment failed. Please check your wallet and try again.'}
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+
+        {/* Playground Interface */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Input Section */}
+>>>>>>> Stashed changes
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
           >
+<<<<<<< Updated upstream
             <VMControlPanel
               publicKey={publicKey}
               currentVmId={currentVmId}
@@ -177,6 +282,36 @@ function PlaygroundContent() {
               onFetchVMId={handleFetchVMId}
               onClearError={clearError}
             />
+=======
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  Input
+                  <Button 
+                    onClick={runModel} 
+                    disabled={!input.trim() || isRunning || x402Loading}
+                    className="ml-2"
+                  >
+                    {paymentStatus === 'processing' ? (
+                      <><Wallet className="w-4 h-4 mr-2" /> Processing Payment...</>
+                    ) : isRunning ? (
+                      <><Play className="w-4 h-4 mr-2" /> Running...</>
+                    ) : (
+                      <><Play className="w-4 h-4 mr-2" /> Run Model</>
+                    )}
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Textarea
+                  placeholder="Enter your prompt or input here..."
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  className="min-h-[300px] resize-none"
+                />
+              </CardContent>
+            </Card>
+>>>>>>> Stashed changes
           </motion.div>
 
           {/* Tab Content */}
@@ -257,6 +392,54 @@ function PlaygroundContent() {
             </Card>
           </motion.div>
         </div>
+<<<<<<< Updated upstream
+=======
+
+        {/* Usage Guidelines */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+          className="mt-8"
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>Usage Guidelines</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <h3 className="font-semibold mb-2">Best Practices</h3>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Be specific and clear in your prompts</li>
+                    <li>• Provide context when necessary</li>
+                    <li>• Start with simple queries to understand the model</li>
+                    <li>• Experiment with different input formats</li>
+                  </ul>
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-2">X402 Payments</h3>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Automatic micropayments via MetaMask</li>
+                    <li>• Payments processed on Base Sepolia</li>
+                    <li>• Pay only for actual model usage</li>
+                    <li>• Transparent pricing and billing</li>
+                  </ul>
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-2">Limitations</h3>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Responses are limited to model capabilities</li>
+                    <li>• Processing time depends on input complexity</li>
+                    <li>• MetaMask connection required for payments</li>
+                    <li>• Sufficient funds needed on Polygon Amoy</li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+>>>>>>> Stashed changes
       </main>
 
       <Footer />

@@ -2,12 +2,14 @@
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Clock, Zap, User, Calendar, ExternalLink, Play } from "lucide-react"
+import { X, Clock, Zap, User, Calendar, ExternalLink, Play, Wallet, CheckCircle, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { SliderHours } from "@/components/SliderHours"
-import { PaymentFlow } from "@/components/PaymentFlow"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useX402Payment } from "@/hooks/useX402Payment"
+import { useWallet } from "@/contexts/WalletContext"
+import { testBackendResponse } from "@/lib/paymentClient"
 import type { ModelManifest } from "@/types/model"
 
 interface ModelModalProps {
@@ -20,8 +22,9 @@ interface ModelModalProps {
 }
 
 export function ModelModal({ model, isOpen, onClose }: ModelModalProps) {
-  const [hours, setHours] = useState(1)
-  const [showPayment, setShowPayment] = useState(false)
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'completed' | 'failed'>('idle')
+  const { createVM, isLoading: x402Loading, error: x402Error, clearError } = useX402Payment()
+  const { isConnected, isConnecting, connectWallet, error: walletError } = useWallet()
 
   // Debug: Log the model data to see what we're receiving
   console.log("🔍 ModelModal received model:", {
@@ -31,6 +34,17 @@ export function ModelModal({ model, isOpen, onClose }: ModelModalProps) {
     objectId: model.objectId,
     uploader: model.uploader
   })
+
+  const handleTestBackend = async () => {
+    try {
+      await testBackendResponse({
+        objectId: model.objectId,
+        uploader: model.uploader
+      })
+    } catch (error) {
+      console.error("Backend test failed:", error)
+    }
+  }
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -51,17 +65,15 @@ export function ModelModal({ model, isOpen, onClose }: ModelModalProps) {
 
   const formatPrice = (pricing: ModelManifest["pricing"]) => {
     if (!pricing || pricing.mode === "free") return "Free"
-    if (pricing.mode === "hourly" && pricing.pricePerHour) {
-      return `${pricing.pricePerHour} POL/hr`
-    }
-    return "Custom"
+    // Fixed 0.5 USDC price for paid models
+    return "0.5 USDC"
   }
 
-  const calculateTotalCost = () => {
-    if (!model.pricing || model.pricing.mode !== "hourly" || !model.pricing.pricePerHour) {
-      return 0
+  const getModelCost = () => {
+    if (!model.pricing || model.pricing.mode === "free") {
+      return "Free"
     }
-    return hours * model.pricing.pricePerHour
+    return "0.5 USDC"
   }
 
   const openWalrusLink = () => {
@@ -71,19 +83,43 @@ export function ModelModal({ model, isOpen, onClose }: ModelModalProps) {
     }
   }
 
-  const handleTryNow = () => {
+  const handleTryNow = async () => {
     if (model.pricing?.mode === "free") {
       // Redirect to playground directly for free models
       window.location.href = `/models/${model.id}/playground`
-    } else {
-      setShowPayment(true)
+      return
     }
-  }
 
-  const handlePaymentSuccess = () => {
-    setShowPayment(false)
-    // Redirect to playground after successful payment
-    window.location.href = `/models/${model.id}/playground`
+    // For paid models, create a proper POST form to avoid 405 error
+    console.log("💳 Creating POST form to backend payment system...")
+    const paymentData = {
+      public_key: model.uploader || 'unknown_uploader',
+      blob_id: model.objectId || model.blobId || 'unknown_object'
+    }
+    console.log("📝 Sending data:", paymentData)
+    
+    // Create a form element
+    const form = document.createElement('form')
+    form.method = 'POST'
+    form.action = 'http://81.15.150.142/api/v1/vms'
+    form.target = '_blank' // Open in new tab
+    form.style.display = 'none'
+    
+    // Add form data as hidden inputs
+    Object.entries(paymentData).forEach(([key, value]) => {
+      const input = document.createElement('input')
+      input.type = 'hidden'
+      input.name = key
+      input.value = value
+      form.appendChild(input)
+    })
+    
+    // Add to DOM, submit, then remove
+    document.body.appendChild(form)
+    form.submit()
+    document.body.removeChild(form)
+    
+    console.log("✅ Form submitted with POST method to new tab")
   }
 
   return (
@@ -190,31 +226,22 @@ export function ModelModal({ model, isOpen, onClose }: ModelModalProps) {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {model.pricing?.mode === "hourly" && model.pricing.pricePerHour && (
-                        <>
-                          <div>
-                            <label className="text-sm font-medium mb-2 block">Usage Duration</label>
-                            <SliderHours value={hours} onChange={setHours} />
+                        <div className="bg-muted/50 rounded-lg p-4">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm text-muted-foreground">Access Fee:</span>
+                            <span className="font-medium">0.5 USDC</span>
                           </div>
-
-                          <div className="bg-muted/50 rounded-lg p-4">
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-sm text-muted-foreground">Duration:</span>
-                              <span className="font-medium">{hours}h</span>
-                            </div>
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-sm text-muted-foreground">Rate:</span>
-                              <span className="font-medium">{model.pricing.pricePerHour} POL/hr</span>
-                            </div>
-                            <div className="border-t border-border pt-2 mt-2">
-                              <div className="flex justify-between items-center">
-                                <span className="font-semibold">Total Cost:</span>
-                                <span className="font-bold text-lg text-primary">
-                                  {calculateTotalCost().toFixed(4)} POL
-                                </span>
-                              </div>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm text-muted-foreground">Network:</span>
+                            <span className="font-medium">Base Sepolia</span>
+                          </div>
+                          <div className="border-t border-border pt-2 mt-2">
+                            <div className="flex justify-between items-center">
+                              <span className="font-semibold">Total Cost:</span>
+                              <span className="font-bold text-lg text-primary">0.5 USDC</span>
                             </div>
                           </div>
-                        </>
+                        </div>
                       )}
 
                       {model.pricing?.mode === "free" && (
@@ -224,15 +251,45 @@ export function ModelModal({ model, isOpen, onClose }: ModelModalProps) {
                         </div>
                       )}
 
-                      <Button onClick={handleTryNow} className="w-full group" size="lg">
-                        <Play className="w-4 h-4 mr-2" />
-                        {model.pricing?.mode === "free" ? "Try Now" : "Pay & Try Now"}
+                      <Button 
+                        onClick={handleTryNow} 
+                        className="w-full group" 
+                        size="lg"
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        {model.pricing?.mode === "free" ? "Try Now" : "Go to Payment & Access Playground"}
                         <ExternalLink className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                       </Button>
 
                       <div className="flex items-center justify-center text-xs text-muted-foreground">
                         <Clock className="w-3 h-3 mr-1" />
                         <span>Instant deployment</span>
+                      </div>
+
+                      {/* Debug: Test Backend Button */}
+                      <div className="space-y-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={handleTestBackend}
+                          className="w-full"
+                          title={`Will send: public_key=${model.uploader}, blob_id=${model.objectId}`}
+                        >
+                          🧪 Test Backend (Form-encoded POST)
+                        </Button>
+                        
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => {
+                            const url = `http://81.15.150.142/api/v1/vms?public_key=${encodeURIComponent(model.uploader || 'test')}&blob_id=${encodeURIComponent(model.objectId || 'test')}`
+                            console.log("🧪 Testing GET request to:", url)
+                            window.open(url, '_blank')
+                          }}
+                          className="w-full text-xs"
+                        >
+                          🔗 Try GET Request (URL params)
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -278,17 +335,6 @@ export function ModelModal({ model, isOpen, onClose }: ModelModalProps) {
               </div>
             </div>
           </motion.div>
-
-          {/* Payment Flow Modal */}
-          {showPayment && model.pricing?.mode === "hourly" && (
-            <PaymentFlow
-              model={model}
-              hours={hours}
-              totalCost={calculateTotalCost()}
-              onSuccess={handlePaymentSuccess}
-              onCancel={() => setShowPayment(false)}
-            />
-          )}
         </div>
       )}
     </AnimatePresence>
