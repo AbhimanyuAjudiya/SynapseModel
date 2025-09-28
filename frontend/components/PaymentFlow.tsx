@@ -6,7 +6,7 @@ import { X, Wallet, AlertCircle, CheckCircle, Loader2, AlertTriangle } from "luc
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { simulatePayment, formatEther } from "@/lib/paymentClient"
+import { simulatePayment, formatEther } from "@/components/paymentClient"
 import { useWallet } from "@/hooks/useWallet"
 import type { ModelManifest } from "@/types/model"
 
@@ -89,7 +89,7 @@ export function PaymentFlow({ model, hours, totalCost, onSuccess, onCancel }: Pa
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-md"
+        className="w-full max-w-md bg-black/70"
       >
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">

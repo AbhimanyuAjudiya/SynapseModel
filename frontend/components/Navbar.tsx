@@ -38,7 +38,7 @@ export function Navbar() {
               >
                 <span className="text-white font-bold text-sm">AI</span>
               </motion.div>
-              <span className="font-bold text-xl text-foreground">Marketplace</span>
+              <span className="font-bold text-xl text-foreground">Synapse Model</span>
             </Link>
 
             {/* Desktop Navigation */}

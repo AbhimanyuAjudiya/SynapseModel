@@ -1,5 +1,5 @@
 import { writeContract, waitForTransactionReceipt } from "wagmi/actions"
-import { config } from "./web3"
+import { config } from "../lib/web3"
 import { parseEther } from "viem"
 
 export interface PaymentRequest {

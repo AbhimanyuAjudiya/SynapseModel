@@ -35,7 +35,7 @@ export default function Upload() {
         >
           <h1 className="text-3xl sm:text-4xl font-bold mb-4 text-balance">Upload AI Model</h1>
           <p className="text-xl text-muted-foreground text-pretty">
-            Share your AI model with the community and start earning from your work
+            Share your AI model with the community 
           </p>
         </motion.div>
 
@@ -101,7 +101,7 @@ export default function Upload() {
           transition={{ duration: 0.6, delay: 0.2 }}
           className="mt-12"
         >
-          <Card>
+          {/* <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <UploadIcon className="w-5 h-5" />
@@ -132,7 +132,7 @@ export default function Upload() {
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </Card> */}
         </motion.div>
       </main>
 

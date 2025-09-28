@@ -1,50 +1,75 @@
 import { useState } from "react"
 import { useParams } from "react-router-dom"
 import { motion } from "framer-motion"
-import { Navbar } from "@/components/Navbar"
-import { Footer } from "@/components/Footer"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Play, Copy, Download } from "lucide-react"
+import { Navbar } from "../../components/Navbar"
+import { Footer } from "../../components/Footer"
+import { Button } from "../../components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card"
+import { Badge } from "../../components/ui/badge"
+import { VMDashboard } from "../components/VMDashboard"
+import { VMControlPanel } from "../components/VMControlPanel"
+import { ModelExecution } from "../components/ModelExecution"
+import { ErrorBoundary } from "../components/ErrorBoundary"
+import { useVM } from "../hooks/useVM"
+import { Server, Brain, Zap, Settings } from "lucide-react"
 
-export default function Playground() {
+function PlaygroundContent() {
   const { id } = useParams<{ id: string }>()
-  const [input, setInput] = useState("")
-  const [output, setOutput] = useState("")
-  const [isRunning, setIsRunning] = useState(false)
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'execution'>('dashboard')
+  
+  const {
+    vmInfo,
+    currentVmId,
+    publicKey,
+    loading,
+    error,
+    executionResult,
+    setPublicKey,
+    setCurrentVmId,
+    fetchVMInfo,
+    fetchVMId,
+    deleteVM,
+    executeModel,
+    executeSentiment,
+    clearError,
+    clearExecutionResult,
+  } = useVM()
 
-  // Mock model data - in real app this would come from API
-  const model = {
-    id: id || "1",
-    name: "GPT-4 Turbo",
-    description: "Advanced language model for complex reasoning and creative tasks",
-    type: "text",
-    framework: "PyTorch",
-    author: "OpenAI Labs"
+  const handlePublicKeyChange = (key: string) => {
+    setPublicKey(key)
   }
 
-  const runModel = async () => {
-    if (!input.trim()) return
-    
-    setIsRunning(true)
-    // Simulate API call
-    setTimeout(() => {
-      setOutput(`Mock response for: "${input}"\n\nThis is a simulated response from the ${model.name} model. In a real implementation, this would connect to the actual model running on the Fluence network.`)
-      setIsRunning(false)
-    }, 2000)
+  const handleFetchVMId = async () => {
+    await fetchVMId()
   }
 
-  const copyOutput = () => {
-    navigator.clipboard.writeText(output)
+  const handleRefreshVMInfo = async () => {
+    await fetchVMInfo()
+  }
+
+  const handleDeleteVM = async () => {
+    if (confirm('Are you sure you want to delete this VM instance? This action cannot be undone and will permanently remove your VM and all data.')) {
+      await deleteVM()
+    }
+  }
+
+  const handleStartInteractiveMode = () => {
+    setActiveTab('execution')
+  }
+
+  const handleExecuteModel = async (input: string) => {
+    await executeModel(input)
+  }
+
+  const handleExecuteSentiment = async (text: string) => {
+    await executeSentiment(text)
   }
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -52,150 +77,197 @@ export default function Playground() {
           transition={{ duration: 0.6 }}
           className="mb-8"
         >
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-3xl sm:text-4xl font-bold mb-2">Model Playground</h1>
+              <h1 className="text-3xl sm:text-4xl font-bold mb-2 flex items-center gap-3">
+                <Server className="w-8 h-8 text-primary" />
+                VM Playground
+              </h1>
               <p className="text-lg text-muted-foreground">
-                Test and interact with {model.name}
+                Manage and execute models on virtual machines
               </p>
             </div>
+            
+            {/* Tab Navigation */}
             <div className="flex gap-2">
-              <Badge variant="secondary">{model.type}</Badge>
-              <Badge variant="outline">{model.framework}</Badge>
+              <Button
+                variant={activeTab === 'dashboard' ? 'default' : 'outline'}
+                onClick={() => setActiveTab('dashboard')}
+                className="flex items-center gap-2"
+              >
+                <Settings className="w-4 h-4" />
+                VM Dashboard
+              </Button>
+              <Button
+                variant={activeTab === 'execution' ? 'default' : 'outline'}
+                onClick={() => setActiveTab('execution')}
+                disabled={!vmInfo?.ip}
+                className="flex items-center gap-2"
+              >
+                <Brain className="w-4 h-4" />
+                Model Execution
+              </Button>
             </div>
           </div>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>{model.name}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-4">{model.description}</p>
-              <div className="flex gap-4 text-sm text-muted-foreground">
-                <span>Author: {model.author}</span>
-                <span>•</span>
-                <span>Framework: {model.framework}</span>
-                <span>•</span>
-                <span>Type: {model.type}</span>
+
+          {/* Status Bar */}
+          <Card className="bg-muted/30">
+            <CardContent className="py-3">
+              <div className="flex flex-wrap items-center gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Status:</span>
+                  {vmInfo ? (
+                    <Badge variant="default" className="bg-green-500/20 text-green-700 border-green-500/30">
+                      Connected
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary">Not Connected</Badge>
+                  )}
+                </div>
+                
+                {vmInfo && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">VM ID:</span>
+                      <code className="text-xs bg-background px-2 py-1 rounded">
+                        {vmInfo.id.substring(0, 8)}...
+                      </code>
+                    </div>
+                    
+                    {vmInfo.ip && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">IP:</span>
+                        <code className="text-xs bg-background px-2 py-1 rounded">
+                          {vmInfo.ip}
+                        </code>
+                      </div>
+                    )}
+                  </>
+                )}
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Mode:</span>
+                  <Badge variant="outline">
+                    <Zap className="w-3 h-3 mr-1" />
+                    Interactive
+                  </Badge>
+                </div>
               </div>
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Playground Interface */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Input Section */}
+        {/* Main Content */}
+        <div className="space-y-6">
+          {/* VM Control Panel - Always visible */}
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
           >
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Input
-                  <Button 
-                    onClick={runModel} 
-                    disabled={!input.trim() || isRunning}
-                    className="ml-2"
-                  >
-                    <Play className="w-4 h-4 mr-2" />
-                    {isRunning ? "Running..." : "Run"}
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  placeholder="Enter your prompt or input here..."
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  className="min-h-[300px] resize-none"
-                />
-              </CardContent>
-            </Card>
+            <VMControlPanel
+              publicKey={publicKey}
+              currentVmId={currentVmId}
+              loading={{
+                fetchingId: loading.fetchingId,
+                fetchingInfo: loading.fetchingInfo,
+              }}
+              error={error}
+              onPublicKeyChange={handlePublicKeyChange}
+              onFetchVMId={handleFetchVMId}
+              onClearError={clearError}
+            />
           </motion.div>
 
-          {/* Output Section */}
+          {/* Tab Content */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            {activeTab === 'dashboard' ? (
+              <VMDashboard
+                vmInfo={vmInfo}
+                loading={{
+                  fetchingInfo: loading.fetchingInfo,
+                  deleting: loading.deleting,
+                }}
+                error={error}
+                onRefresh={handleRefreshVMInfo}
+                onDelete={handleDeleteVM}
+                onClearError={clearError}
+                onStartInteractiveMode={handleStartInteractiveMode}
+              />
+            ) : (
+              <ModelExecution
+                vmIp={vmInfo?.ip || null}
+                loading={loading.executing}
+                executionResult={executionResult}
+                onExecuteModel={handleExecuteModel}
+                onExecuteSentiment={handleExecuteSentiment}
+                onClearResult={clearExecutionResult}
+              />
+            )}
+          </motion.div>
+
+          {/* Usage Guidelines */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
           >
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Output
-                  {output && (
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={copyOutput}>
-                        <Copy className="w-4 h-4 mr-2" />
-                        Copy
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Download className="w-4 h-4 mr-2" />
-                        Export
-                      </Button>
-                    </div>
-                  )}
-                </CardTitle>
+                <CardTitle>Usage Guidelines</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="min-h-[300px] p-4 bg-muted/50 rounded-md font-mono text-sm whitespace-pre-wrap">
-                  {isRunning ? (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    </div>
-                  ) : output ? (
-                    output
-                  ) : (
-                    <span className="text-muted-foreground">
-                      Output will appear here after running the model...
-                    </span>
-                  )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h3 className="font-semibold mb-3">Getting Started</h3>
+                    <ul className="text-sm text-muted-foreground space-y-2">
+                      <li>• Enter your wallet's public key to connect</li>
+                      <li>• Your VM will be automatically fetched and connected</li>
+                      <li>• Use Interactive Mode to start executing models</li>
+                      <li>• Monitor your VM status in the dashboard</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-3">Model Execution</h3>
+                    <ul className="text-sm text-muted-foreground space-y-2">
+                      <li>• General models for text generation and processing</li>
+                      <li>• Sentiment analysis for text classification</li>
+                      <li>• Real-time results with detailed feedback</li>
+                      <li>• Export and download execution results</li>
+                    </ul>
+                  </div>
+                </div>
+                
+                <div className="mt-6 pt-4 border-t">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Server className="w-4 h-4 text-muted-foreground" />
+                    <h3 className="font-semibold">VM Management</h3>
+                  </div>
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <p>• <strong>Interactive Mode:</strong> Execute models and analyze data in real-time</p>
+                    <p>• <strong>Delete Instance:</strong> Permanently remove your VM when no longer needed</p>
+                    <p>• <strong>Refresh:</strong> Update VM status and connection information</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           </motion.div>
         </div>
-
-        {/* Usage Guidelines */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-          className="mt-8"
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle>Usage Guidelines</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="font-semibold mb-2">Best Practices</h3>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Be specific and clear in your prompts</li>
-                    <li>• Provide context when necessary</li>
-                    <li>• Start with simple queries to understand the model</li>
-                    <li>• Experiment with different input formats</li>
-                  </ul>
-                </div>
-                <div>
-                  <h3 className="font-semibold mb-2">Limitations</h3>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Responses are limited to model capabilities</li>
-                    <li>• Processing time depends on input complexity</li>
-                    <li>• Some content may be filtered for safety</li>
-                    <li>• Usage costs apply for extended sessions</li>
-                  </ul>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
       </main>
 
       <Footer />
     </div>
+  )
+}
+
+export default function Playground() {
+  return (
+    <ErrorBoundary>
+      <PlaygroundContent />
+    </ErrorBoundary>
   )
 }
