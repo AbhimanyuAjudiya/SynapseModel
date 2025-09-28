@@ -4,3 +4,5 @@ paramiko
 fastapi
 pydantic
 python-dotenv
+x402    
+cdp

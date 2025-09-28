@@ -107,3 +107,9 @@ dmypy.json
 /backend/mykey
 /backend/temp
 /backend.zip
+/backend/.terraform.lock.hcl
+/backend/.terraform
+/backend/terraform.tfstate
+/backend/terraform.tfvars
+/backend/terraform.tfstate.backup
+/backend/manage_keys
